@@ -23,7 +23,7 @@ import duckdb
 from bs4 import BeautifulSoup
 
 # ─── Config ──────────────────────────────────────────────────────────────
-DATA_ROOT = Path(os.getenv("DMB_DATA_ROOT", "/Users/blackstarr/CLAUDE COWORK/daily-market-brief/data"))
+DATA_ROOT = Path(os.getenv("DMB_DATA_ROOT", Path(__file__).parent.parent / "data"))
 RAW_DIR = DATA_ROOT / "raw"
 PARQUET_DIR = DATA_ROOT / "parquet"
 DUCKDB_PATH = DATA_ROOT / "market.duckdb"

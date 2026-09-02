@@ -17,7 +17,7 @@ import requests
 from jinja2 import Template
 
 # ─── Config ──────────────────────────────────────────────────────────────
-DATA_ROOT = Path("/Users/blackstarr/CLAUDE COWORK/daily-market-brief/data")
+DATA_ROOT = Path(__file__).parent.parent / "data"
 OUTPUT_DIR = DATA_ROOT / "briefs"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 

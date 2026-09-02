@@ -16,7 +16,7 @@ import pandas as pd
 import duckdb
 
 # ─── Config ──────────────────────────────────────────────────────────────
-DATA_ROOT = Path("/Users/blackstarr/CLAUDE COWORK/daily-market-brief/data")
+DATA_ROOT = Path(__file__).parent.parent / "data"
 PARQUET_DIR = DATA_ROOT / "parquet"
 DUCKDB_PATH = DATA_ROOT / "market.duckdb"
 OUTPUT_DIR = DATA_ROOT / "correlation"

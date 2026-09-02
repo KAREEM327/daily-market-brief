@@ -110,7 +110,7 @@ def main():
     results = run_pipeline(force=force)
 
     # Save pipeline log
-    log_dir = Path("/Users/blackstarr/CLAUDE COWORK/daily-market-brief/data/logs")
+    log_dir = Path(__file__).parent.parent / "data" / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / f"pipeline_{date.today().isoformat()}.json"
     with open(log_file, "w") as f:
