@@ -144,19 +144,7 @@ def parse_cot_report():
     Source: https://www.cftc.gov/dea/futures/deanymes_f.htm
     """
     try:
-        # CFTC publishes weekly COT reports; we get the latest futures only
-        url = "https://www.cftc.gov/files/dea/history/fut_disagg_txt_2024.zip"  # example, need latest
-        # Instead, we can use the weekly report directly: they have a legacy format
-        # Let's use the known location for the latest report (as of 2024, but we can generalize)
-        # Actually, CFTC provides a Master list: we can get the latest from their JSON?
-        # Simpler: use the last 5 years zip and extract the latest? Too heavy.
-        # Alternative: use the API from quiverquant or similar? But we want free.
-        # We'll use the CFTC's weekly report in text format: they have a consistent naming.
-        # For simplicity, we'll download the latest futures_disagg.txt.zip from:
-        # https://www.cftc.gov/files/dea/history/fut_disagg_txt_2024.zip (need to update year)
-        # Let's get current year and try.
         year = datetime.now().year
-        # Try current year, fall back to previous year
         urls = [
             f"https://www.cftc.gov/files/dea/history/fut_disagg_txt_{year}.zip",
             f"https://www.cftc.gov/files/dea/history/fut_disagg_txt_{year-1}.zip"
@@ -165,53 +153,29 @@ def parse_cot_report():
         for u in urls:
             resp = requests.get(u, timeout=10)
             if resp.status_code == 200:
-                url = u
                 break
         if resp is None or resp.status_code != 200:
-        # If fails, try previous year
-        resp = requests.get(url, timeout=10)
-        if resp.status_code != 200:
-            year = year - 1
-            # Try current year, fall back to previous year
-        urls = [
-            f"https://www.cftc.gov/files/dea/history/fut_disagg_txt_{year}.zip",
-            f"https://www.cftc.gov/files/dea/history/fut_disagg_txt_{year-1}.zip"
-        ]
-        resp = None
-        for u in urls:
-            resp = requests.get(u, timeout=10)
-            if resp.status_code == 200:
-                url = u
-                break
-        if resp is None or resp.status_code != 200:
-            resp = requests.get(url, timeout=10)
-            if resp.status_code != 200:
-                return {"error": "Could not download COT data"}
-        # Extract the zip in memory
+            return {"error": "Could not download COT data"}
+
+        # Extract zip and find the latest .txt file
         import zipfile
         import io
-        zipfile = zipfile.ZipFile(io.BytesIO(resp.content))
-        # Get the latest file in the zip (by name)
-        filenames = zipfile.namelist()
-        # Look for the latest report (they are named like Futures_20240903.txt)
-        txt_files = [f for f in filenames if f.endswith('.txt') and f.startswith('Futures_')]
+        zip_file = zipfile.ZipFile(io.BytesIO(resp.content))
+        txt_files = [f for f in zip_file.namelist() if f.endswith('.txt')]
         if not txt_files:
-            return {"error": "No txt files in COT zip"}
-        # Sort to get latest
-        txt_files.sort(reverse=True)
-        latest_file = txt_files[0]
-        # Read the file
-        with zipfile.open(latest_file) as f:
-            content = f.read().decode('utf-8')
+            return {"error": "No txt file in COT zip"}
+        
+        # Get the latest txt file
+        latest_txt = sorted(txt_files)[-1]
+        with zip_file.open(latest_txt) as f:
+            lines = f.read().decode('utf-8').splitlines()
+        
         # Parse the legacy format
-        # Each line is a fixed-width record; we need to find the relevant futures
-        # We'll parse for the commodities we care about
-        lines = content.split('\n')
         data = {}
         for line in lines:
             if len(line) < 100:
                 continue
-            # Format: 
+            # Format:
             # Market_and_Exchange_Names (0-30), CFTC_Market_Code (31-35), etc.
             # We'll use a simple approach: look for the market name in our map
             market_name = line[0:30].strip()
