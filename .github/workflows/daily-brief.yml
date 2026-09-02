@@ -1,0 +1,72 @@
+name: Daily Market Brief
+
+on:
+  schedule:
+    # 5:30 AM ET = 9:30 UTC (Mon-Fri)
+    - cron: '30 9 * * 1-5'
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  daily-brief:
+    name: Generate Daily Market Brief
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      # API Keys (set in GitHub Secrets)
+      FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+      ALPHA_VANTAGE_KEY: ${{ secrets.ALPHA_VANTAGE_KEY }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      DMB_DATA_ROOT: /home/runner/work/daily-market-brief/daily-market-brief/data
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run pipeline
+        run: |
+          cd daily-market-brief
+          python scripts/run_pipeline.py --force
+
+      - name: Upload brief artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: daily-brief-${{ github.run_id }}
+          path: |
+            daily-market-brief/data/briefs/brief_*.md
+            daily-market-brief/data/logs/pipeline_*.json
+          retention-days: 30
+
+      - name: Commit brief to repo (archive)
+        if: success()
+        run: |
+          cd daily-market-brief
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add data/briefs/ data/logs/ || true
+          git commit -m "brief: ${{ github.event.schedule == '30 9 * * 1-5' && 'scheduled' || 'manual' }} $(date +%F)" || echo "No changes to commit"
+          git push || echo "Push failed (may be expected)"
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          if [ -n "${{ secrets.TELEGRAM_BOT_TOKEN }}" ] && [ -n "${{ secrets.TELEGRAM_CHAT_ID }}" ]; then
+            curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+              -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+              -d text="❌ Daily Market Brief pipeline failed — check GitHub Actions" \
+              -d parse_mode="Markdown"
+          fi
