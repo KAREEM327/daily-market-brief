@@ -9,6 +9,7 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import requests
+import logging
 from datetime import datetime, timedelta
 import warnings
 warnings.filterwarnings('ignore')
@@ -97,8 +98,8 @@ def fetch_term_structure(futures_root):
     # Determine current year and month to get next few contracts
     now = datetime.now()
     contracts = []
-    # We'll try to get front 3 months
-    for i in range(3):
+    # We'll try to get front 3 months - try current year and next year
+    for i in range(6):  # try up to 6 months out
         month_idx = (now.month - 1 + i) % 12
         year = now.year + ((now.month - 1 + i) // 12)
         ticker = f"{futures_root}{month_codes[month_idx]}{str(year)[-2:]}=F"
@@ -113,9 +114,11 @@ def fetch_term_structure(futures_root):
                     'month': month_idx + 1,
                     'year': year
                 })
+                if len(contracts) >= 3:
+                    break
         except:
             continue
-    return contracts
+    return contracts if len(contracts) >= 2 else None
 
 def calculate_calendar_spread(futures_root):
     """
@@ -153,12 +156,34 @@ def parse_cot_report():
         # https://www.cftc.gov/files/dea/history/fut_disagg_txt_2024.zip (need to update year)
         # Let's get current year and try.
         year = datetime.now().year
-        url = f"https://www.cftc.gov/files/dea/history/fut_disagg_txt_{year}.zip"
+        # Try current year, fall back to previous year
+        urls = [
+            f"https://www.cftc.gov/files/dea/history/fut_disagg_txt_{year}.zip",
+            f"https://www.cftc.gov/files/dea/history/fut_disagg_txt_{year-1}.zip"
+        ]
+        resp = None
+        for u in urls:
+            resp = requests.get(u, timeout=10)
+            if resp.status_code == 200:
+                url = u
+                break
+        if resp is None or resp.status_code != 200:
         # If fails, try previous year
         resp = requests.get(url, timeout=10)
         if resp.status_code != 200:
             year = year - 1
-            url = f"https://www.cftc.gov/files/dea/history/fut_disagg_txt_{year}.zip"
+            # Try current year, fall back to previous year
+        urls = [
+            f"https://www.cftc.gov/files/dea/history/fut_disagg_txt_{year}.zip",
+            f"https://www.cftc.gov/files/dea/history/fut_disagg_txt_{year-1}.zip"
+        ]
+        resp = None
+        for u in urls:
+            resp = requests.get(u, timeout=10)
+            if resp.status_code == 200:
+                url = u
+                break
+        if resp is None or resp.status_code != 200:
             resp = requests.get(url, timeout=10)
             if resp.status_code != 200:
                 return {"error": "Could not download COT data"}
@@ -247,15 +272,21 @@ def analyze_futures():
     # 1. Term structure for key commodities
     key_commodities = ['CL', 'GC', 'SI', 'HG', 'NG', 'ZC', 'ZS', 'ZW']
     for comm in key_commodities:
-        term = fetch_term_structure(comm)
-        if term:
-            results['term_structure'][comm] = term
+        try:
+            term = fetch_term_structure(comm)
+            if term:
+                results['term_structure'][comm] = term
+        except Exception as e:
+            log.debug(f"Term structure failed for {comm}: {e}")
     
     # 2. Calendar spreads (front vs second month)
     for comm in key_commodities:
-        spread = calculate_calendar_spread(comm)
-        if spread:
-            results['calendar_spreads'][comm] = spread
+        try:
+            spread = calculate_calendar_spread(comm)
+            if spread:
+                results['calendar_spreads'][comm] = spread
+        except Exception as e:
+            log.debug(f"Calendar spread failed for {comm}: {e}")
     
     # 3. COT data
     cot_data = parse_cot_report()

@@ -347,7 +347,10 @@ def run_correlation_analysis() -> Dict[str, Any]:
         "as_of": date.today().isoformat(),
         "current_correlation_matrix": current_corr.round(3).to_dict() if not current_corr.empty else {},
         "rolling_correlations": {str(k): v.round(3).to_dict() for k, v in rolling_corrs.items()},
-        "regime_conditional_correlations": {k: v.round(3).to_dict() for k, v in cond_corrs.items()},
+        "regime_conditional_correlations": {
+            k: {str(kk): {str(kkk): vvv for kkk, vvv in vv.items()} for kk, vv in v.round(3).to_dict().items()}
+            for k, v in cond_corrs.items()
+        },
         "divergence_alerts": alerts,
         "group_heatmaps": heatmap,
         "spy_betas": betas.to_dict() if not betas.empty else {},

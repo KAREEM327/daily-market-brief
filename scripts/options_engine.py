@@ -30,7 +30,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 log = logging.getLogger("dmb.options")
 
 # Major index/ETF options to track
-OPTION_TICKERS = ["SPY", "QQQ", "IWM", "SPX", "NDX", "RUT"]
+OPTION_TICKERS = ["SPY", "QQQ", "IWM"]  # ETFs with liquid options chains via yfinance
 VIX_TICKERS = ["VIX", "VX3M", "VXMT"]
 
 
@@ -50,7 +50,10 @@ def fetch_cboe_options_data(ticker: str = "SPX") -> Optional[pd.DataFrame]:
         return None
 
     try:
-        resp = requests.get(url, timeout=30)
+        resp = requests.get(url, timeout=10)
+        if resp.status_code == 403:
+            log.debug(f"CBOE 403 for {ticker}, skipping")
+            return None
         resp.raise_for_status()
         data = resp.json()
         # Parse options chain
