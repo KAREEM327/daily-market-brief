@@ -1,0 +1,46 @@
+name: Daily Market Brief
+
+on:
+  schedule:
+    - cron: '30 9 * * 1-5'  # 5:30 AM ET = 9:30 UTC (Mon-Fri)
+  workflow_dispatch:  # manual trigger
+
+jobs:
+  brief:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run pipeline
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          ALPHA_VANTAGE_KEY: ${{ secrets.ALPHA_VANTAGE_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python scripts/run_pipeline.py
+      - name: Send brief to Telegram
+        if: env.TELEGRAM_BOT_TOKEN != ''
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          BRIEF_FILE=$(ls -t briefs/brief_*.md 2>/dev/null | head -1)
+          if [ -n "$BRIEF_FILE" ]; then
+            curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
+              -F chat_id="${TELEGRAM_CHAT_ID}" \
+              -F document=@"$BRIEF_FILE" \
+              -F caption="📊 Daily Market Brief — $(date +'%b %d, %Y')"
+          fi
+      - name: Commit brief archive
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add briefs/
+          git commit -m "brief: $(date +%F)" || true
+          git push || true
