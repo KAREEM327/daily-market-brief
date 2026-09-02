@@ -33,7 +33,7 @@ CORE_ASSETS = [
     "UUP", "FXE", "FXY",               # Currencies
     "EEM", "FXI", "EWG", "EWJ",        # International
     "XLF", "XLK", "XLE", "XLV", "XLY", # Sectors
-    "VIX",                             # Volatility
+    "^VIX",                             # Volatility
 ]
 
 CORRELATION_WINDOWS = [21, 63, 126, 252]  # 1m, 3m, 6m, 12m
@@ -342,26 +342,53 @@ def run_correlation_analysis() -> Dict[str, Any]:
     # 7. Crisis analysis
     crisis = crisis_correlation_analysis(returns)
 
+    def make_serializable(obj):
+        """Recursively convert non-JSON-serializable objects."""
+        import pandas as pd
+        import numpy as np
+        if isinstance(obj, (pd.Timestamp, pd.Timedelta)):
+            return obj.isoformat()
+        elif isinstance(obj, dict):
+            return {str(k): make_serializable(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [make_serializable(v) for v in obj]
+        elif isinstance(obj, (np.integer, np.floating)):
+            return float(obj) if not np.isnan(obj) else None
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, pd.DataFrame):
+            return make_serializable(obj.round(3).to_dict())
+        elif isinstance(obj, pd.Series):
+            return make_serializable(obj.round(3).to_dict())
+        elif obj is None:
+            return None
+        elif hasattr(obj, '__float__'):
+            try:
+                val = float(obj)
+                return val if not np.isnan(val) else None
+            except (TypeError, ValueError):
+                return str(obj)
+        elif isinstance(obj, float) and np.isnan(obj):
+            return None
+        return obj
+
     # Compile results
     results = {
         "as_of": date.today().isoformat(),
-        "current_correlation_matrix": current_corr.round(3).to_dict() if not current_corr.empty else {},
-        "rolling_correlations": {str(k): v.round(3).to_dict() for k, v in rolling_corrs.items()},
-        "regime_conditional_correlations": {
-            k: {str(kk): {str(kkk): vvv for kkk, vvv in vv.items()} for kk, vv in v.round(3).to_dict().items()}
-            for k, v in cond_corrs.items()
-        },
-        "divergence_alerts": alerts,
-        "group_heatmaps": heatmap,
-        "spy_betas": betas.to_dict() if not betas.empty else {},
-        "stability_metrics": stability,
-        "crisis_analysis": crisis,
+        "current_correlation_matrix": make_serializable(current_corr.round(3).to_dict()) if not current_corr.empty else {},
+        "rolling_correlations": {str(k): make_serializable(v.round(3).to_dict()) for k, v in rolling_corrs.items()},
+        "regime_conditional_correlations": make_serializable(cond_corrs),
+        "divergence_alerts": make_serializable(alerts),
+        "group_heatmaps": make_serializable(heatmap),
+        "spy_betas": make_serializable(betas.to_dict()) if not betas.empty else {},
+        "stability_metrics": make_serializable(stability),
+        "crisis_analysis": make_serializable(crisis),
     }
 
     # Save
     output_file = OUTPUT_DIR / f"correlation_{date.today().isoformat()}.json"
     with open(output_file, "w") as f:
-        json.dump(results, f, indent=2, default=str)
+        json.dump(results, f, indent=2)
     log.info(f"Saved correlation analysis to {output_file}")
 
     # Summary

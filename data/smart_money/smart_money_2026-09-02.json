@@ -1,0 +1,33 @@
+{
+  "13f_conviction": {
+    "tracked_funds": [
+      "Berkshire Hathaway",
+      "Bridgewater Associates",
+      "Renaissance Technologies",
+      "Citadel Advisors",
+      "Two Sigma",
+      "D.E. Shaw",
+      "Millennium Management",
+      "Point72",
+      "Tiger Global",
+      "Coatue",
+      "Viking Global",
+      "Lone Pine",
+      "Soros Fund",
+      "Appaloosa",
+      "Third Point",
+      "Pershing Square",
+      "ValueAct",
+      "Elliott Management",
+      "Starboard Value",
+      "Jana Partners",
+      "Engine No. 1"
+    ],
+    "status": "requires 13F database build",
+    "note": "Build historical 13F database from SEC EDGAR for conviction tracking"
+  },
+  "short_interest": {},
+  "buybacks": {
+    "status": "requires SEC 8-K parser"
+  }
+}

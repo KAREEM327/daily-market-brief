@@ -1,0 +1,96 @@
+{
+  "date": "2026-09-02",
+  "steps": {
+    "Data Ingestion": {
+      "status": "failed",
+      "elapsed_seconds": 36.2,
+      "error": "Catalog Error: Schema with name equities_DX_Y does not exist!"
+    },
+    "Regime Engine": {
+      "status": "success",
+      "elapsed_seconds": 4.9,
+      "output_keys": [
+        "SPY",
+        "QQQ",
+        "IWM",
+        "DIA",
+        "TLT",
+        "GLD",
+        "USO",
+        "UUP",
+        "EEM",
+        "FXI",
+        "EWG",
+        "EWJ",
+        "XLF",
+        "XLK",
+        "XLE",
+        "correlation_matrix",
+        "regime_conditional_correlations"
+      ]
+    },
+    "Correlation Engine": {
+      "status": "success",
+      "elapsed_seconds": 0.3,
+      "output_keys": [
+        "as_of",
+        "current_correlation_matrix",
+        "rolling_correlations",
+        "regime_conditional_correlations",
+        "divergence_alerts",
+        "group_heatmaps",
+        "spy_betas",
+        "stability_metrics",
+        "crisis_analysis"
+      ]
+    },
+    "Analogue Engine": {
+      "status": "success",
+      "elapsed_seconds": 0.1,
+      "output_keys": [
+        "error"
+      ]
+    },
+    "Futures Engine": {
+      "status": "success",
+      "elapsed_seconds": 25.0,
+      "output_keys": [
+        "term_structure",
+        "calendar_spreads",
+        "cot_data",
+        "alerts",
+        "summary"
+      ]
+    },
+    "Options Engine": {
+      "status": "success",
+      "elapsed_seconds": 1.1,
+      "output_keys": [
+        "vrp",
+        "vix_spot",
+        "realized_vol_21d"
+      ]
+    },
+    "Smart Money Engine": {
+      "status": "success",
+      "elapsed_seconds": 31.8,
+      "output_keys": [
+        "13f_conviction",
+        "short_interest",
+        "buybacks"
+      ]
+    },
+    "Brief Generator": {
+      "status": "success",
+      "elapsed_seconds": 0.0,
+      "output_keys": [
+        "brief",
+        "path",
+        "telegram_sent",
+        "engines_used"
+      ]
+    }
+  },
+  "total_elapsed_seconds": 99.4,
+  "overall_status": "partial"
+}

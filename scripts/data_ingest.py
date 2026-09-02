@@ -44,14 +44,12 @@ MACRO_TICKERS = {
     "QQQ": "Nasdaq 100",
     "IWM": "Russell 2000",
     "DIA": "Dow Jones",
-    "VIX": "VIX Index",
-    "VX3M": "VIX 3M Futures",
-    "VXMT": "VIX 6M Futures",
+    "^VIX": "VIX Index",
     "^TNX": "10Y Yield",
     "^TYX": "30Y Yield",
     "^FVX": "5Y Yield",
     "^IRX": "3M Yield",
-    "DXY": "Dollar Index",
+    "DX-Y.NYB": "Dollar Index",
     "EURUSD=X": "EUR/USD",
     "USDJPY=X": "USD/JPY",
     "GC=F": "Gold",
@@ -86,7 +84,6 @@ MACRO_TICKERS = {
     "SMH": "Semiconductors",
     "SOXX": "Semiconductors (alt)",
     "ARKK": "Innovation",
-    "QQQ": "Nasdaq 100",
 }
 
 FRED_SERIES = {
@@ -518,10 +515,12 @@ def run_full_ingestion() -> Dict[str, Any]:
             if isinstance(datasets, dict):
                 for name, df in datasets.items():
                     if df is not None and len(df) > 0:
-                        table_name = f"{category}_{name}".replace("-", "_").replace("^", "").replace("=", "_")
+                        table_name = f"{category}_{name}".replace("-", "_").replace(".", "_").replace("=", "_").replace("^", "")
+                        table_name = "".join(c for c in table_name if c.isalnum() or c == "_")
                         con.execute(f"CREATE OR REPLACE TABLE {table_name} AS SELECT * FROM df")
             elif datasets is not None and len(datasets) > 0:
-                table_name = category.replace("-", "_").replace("^", "").replace("=", "_")
+                table_name = category.replace("-", "_").replace(".", "_").replace("=", "_").replace("^", "")
+                table_name = "".join(c for c in table_name if c.isalnum() or c == "_")
                 con.execute(f"CREATE OR REPLACE TABLE {table_name} AS SELECT * FROM datasets")
     finally:
         con.close()

@@ -31,7 +31,7 @@ log = logging.getLogger("dmb.options")
 
 # Major index/ETF options to track
 OPTION_TICKERS = ["SPY", "QQQ", "IWM"]  # ETFs with liquid options chains via yfinance
-VIX_TICKERS = ["VIX", "VX3M", "VXMT"]
+VIX_TICKER = "^VIX"
 
 
 # ─── Data Fetching ───────────────────────────────────────────────────────

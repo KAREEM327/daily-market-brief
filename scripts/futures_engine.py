@@ -80,10 +80,10 @@ def fetch_continuous_front_month(ticker_symbol):
         change = ((last - prev_close) / prev_close) * 100
         return {
             'symbol': ticker_symbol.replace('=F', ''),
-            'last': round(last, 2),
-            'change_pct': round(change, 2),
+            'last': round(float(last), 2),
+            'change_pct': round(float(change), 2),
             'volume': int(hist['Volume'].iloc[-1]) if 'Volume' in hist.columns else 0,
-            'hist': hist  # keep for term structure if needed
+            # Don't store hist - it causes JSON issues
         }
     except Exception as e:
         print(f"Error fetching {ticker_symbol}: {e}")
@@ -91,50 +91,39 @@ def fetch_continuous_front_month(ticker_symbol):
 
 def fetch_term_structure(futures_root):
     """
-    Fetch term structure for a given futures root (e.g., CL for crude oil).
-    We'll get the front 3 contracts by month codes.
+    Fetch term structure for a given futures root using yfinance continuous contracts.
+    yfinance provides continuous front-month contracts like CL=F, GC=F, etc.
+    We'll use multiple contract months if available, but mainly rely on continuous.
     """
-    month_codes = ['F', 'G', 'H', 'J', 'K', 'M', 'N', 'Q', 'U', 'V', 'X', 'Z']  # Jan-Dec
-    # Determine current year and month to get next few contracts
-    now = datetime.now()
-    contracts = []
-    # We'll try to get front 3 months - try current year and next year
-    for i in range(6):  # try up to 6 months out
-        month_idx = (now.month - 1 + i) % 12
-        year = now.year + ((now.month - 1 + i) // 12)
-        ticker = f"{futures_root}{month_codes[month_idx]}{str(year)[-2:]}=F"
-        try:
-            tk = yf.Ticker(ticker)
-            hist = tk.history(period="5d")
-            if not hist.empty:
-                price = hist['Close'].iloc[-1]
-                contracts.append({
-                    'ticker': ticker,
-                    'price': round(price, 2),
-                    'month': month_idx + 1,
-                    'year': year
-                })
-                if len(contracts) >= 3:
-                    break
-        except:
-            continue
-    return contracts if len(contracts) >= 2 else None
+    # Try to get term structure from available contracts
+    # yfinance has limited term structure - mainly continuous front month
+    # We'll use the continuous contract and note that detailed term structure needs paid data
+    try:
+        ticker = yf.Ticker(f"{futures_root}=F")
+        hist = ticker.history(period="60d")
+        if hist.empty:
+            return None
+        
+        last = hist['Close'].iloc[-1]
+        prev = hist['Close'].iloc[-2] if len(hist) > 1 else last
+        change = ((last - prev) / prev) * 100
+        
+        return [{
+            'ticker': f"{futures_root}=F",
+            'price': round(float(last), 2),
+            'change_pct': round(float(change), 2),
+            'volume': int(hist['Volume'].iloc[-1]) if 'Volume' in hist.columns else 0,
+            'contract_type': 'continuous_front'
+        }]
+    except Exception as e:
+        logging.debug(f"Term structure failed for {futures_root}: {e}")
+        return None
 
 def calculate_calendar_spread(futures_root):
     """
-    Calculate calendar spread between front and second month.
+    Calculate calendar spread - not available with continuous contracts only.
+    Returns None since we don't have multiple contract months from yfinance.
     """
-    term = fetch_term_structure(futures_root)
-    if len(term) >= 2:
-        front = term[0]['price']
-        second = term[1]['price']
-        spread = second - front  # positive = contango (normal for commodities)
-        return {
-            'front_month': f"{term[0]['ticker']} @ {front}",
-            'second_month': f"{term[1]['ticker']} @ {second}",
-            'spread': round(spread, 2),
-            'spread_pct': round((spread / front) * 100, 2) if front != 0 else 0
-        }
     return None
 
 def parse_cot_report():
@@ -226,33 +215,29 @@ def analyze_futures():
     Returns a dict with insights for the brief.
     """
     results = {
-        'term_structure': {},
-        'calendar_spreads': {},
+        'front_month': {},
         'cot_data': {},
         'alerts': [],
         'summary': ''
     }
     
-    # 1. Term structure for key commodities
+    # 1. Front month continuous contracts
     key_commodities = ['CL', 'GC', 'SI', 'HG', 'NG', 'ZC', 'ZS', 'ZW']
-    for comm in key_commodities:
+    key_indices = ['ES', 'NQ', 'RTY']
+    key_rates = ['ZT', 'ZF', 'ZN', 'ZB']
+    key_fx = ['6E', '6J', '6B']
+    
+    all_roots = key_commodities + key_indices + key_rates + key_fx
+    
+    for root in all_roots:
         try:
-            term = fetch_term_structure(comm)
+            term = fetch_term_structure(root)
             if term:
-                results['term_structure'][comm] = term
+                results['front_month'][root] = term[0]
         except Exception as e:
-            log.debug(f"Term structure failed for {comm}: {e}")
+            logging.debug(f"Front month failed for {root}: {e}")
     
-    # 2. Calendar spreads (front vs second month)
-    for comm in key_commodities:
-        try:
-            spread = calculate_calendar_spread(comm)
-            if spread:
-                results['calendar_spreads'][comm] = spread
-        except Exception as e:
-            log.debug(f"Calendar spread failed for {comm}: {e}")
-    
-    # 3. COT data
+    # 2. COT data
     cot_data = parse_cot_report()
     if isinstance(cot_data, dict) and 'error' not in cot_data:
         results['cot_data'] = cot_data
@@ -276,27 +261,20 @@ def analyze_futures():
     else:
         results['cot_data'] = {'error': cot_data.get('error', 'Unknown error') if isinstance(cot_data, dict) else str(cot_data)}
     
-    # 4. Generate summary text
+    # 3. Generate summary text
     summary_parts = []
-    # Term structure insights
-    for comm, term in results['term_structure'].items():
-        if len(term) >= 2:
-            front = term[0]['price']
-            second = term[1]['price']
-            spread = second - front
-            if spread > 0:
-                summary_parts.append(f"{comm} contango {spread:.2f}")
-            else:
-                summary_parts.append(f"{comm} backwardation {abs(spread):.2f}")
+    # Front month prices
+    for root, data in results['front_month'].items():
+        summary_parts.append(f"{root} {data['price']:.2f} ({data['change_pct']:+.1f}%)")
     
     # COT extremes
     if results['alerts']:
         summary_parts.extend(results['alerts'][:2])  # top 2 alerts
     
     if not summary_parts:
-        results['summary'] = "Futures markets showing no extreme term structure or positioning."
+        results['summary'] = "Futures markets data loading..."
     else:
-        results['summary'] = " | ".join(summary_parts[:3])  # limit length
+        results['summary'] = " | ".join(summary_parts[:5])  # limit length
     
     return results
 
