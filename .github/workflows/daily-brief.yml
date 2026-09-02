@@ -41,6 +41,6 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git add briefs/
+          git add data/briefs/
           git commit -m "brief: $(date +%F)" || true
           git push || true
